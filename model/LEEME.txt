@@ -1,0 +1,1 @@
+Descomprime aquí el contenido de modelo_web.zip (model.json, group1-shard*.bin, labels.json).

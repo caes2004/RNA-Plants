@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14532d">
+<title>Identificador de hojas · CNN</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%2314532d'/%3E%3Cpath d='M48 14C29 14 16 24 16 39c0 7 5 12 12 12 15 0 21-15 20-37z' fill='%23dcfce7'/%3E%3Cpath d='M18 50c7-13 17-21 27-29M27 42l-1-10M34 35l9 1' fill='none' stroke='%2314532d' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<style>
+  :root{
+    --verde:#166534; --verde-osc:#14532d; --verde-cl:#dcfce7; --lima:#a3e635;
+    --texto:#1c1917; --suave:#57534e; --borde:#e7e5e4; --fondo:#f7f7f2; --card:#fff;
+    --rojo:#b91c1c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fondo);color:var(--texto);line-height:1.45}
+  header{background:linear-gradient(135deg,var(--verde-osc),var(--verde));color:#fff;padding:22px 18px 26px}
+  header .wrap{max-width:760px;margin:auto}
+  header h1{margin:0;font-size:1.55rem;letter-spacing:-.01em}
+  header p{margin:.35rem 0 0;opacity:.85;font-size:.95rem}
+  main{max-width:760px;margin:-14px auto 40px;padding:0 14px}
+  .card{background:var(--card);border:1px solid var(--borde);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .estado{display:flex;align-items:center;gap:10px;font-size:.92rem;color:var(--suave)}
+  .punto{width:10px;height:10px;border-radius:50%;background:#d6d3d1;flex:none}
+  .punto.ok{background:#16a34a}.punto.carga{background:#f59e0b;animation:lat 1s infinite}.punto.error{background:var(--rojo)}
+  @keyframes lat{50%{opacity:.3}}
+  .barra-carga{height:4px;background:var(--borde);border-radius:4px;margin-top:10px;overflow:hidden}
+  .barra-carga div{height:100%;width:0;background:var(--verde);transition:width .2s}
+  .botones{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{appearance:none;border:0;border-radius:12px;padding:15px 12px;font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px}
+  .btn-prim{background:var(--verde);color:#fff;grid-column:1/-1;font-size:1.1rem;min-height:62px}
+  .btn-sec{background:var(--verde-cl);color:var(--verde-osc)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn:active:not(:disabled){transform:scale(.98)}
+  .icon{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.16em;flex:none}
+  .icon-fill{fill:currentColor;stroke:none}
+  .icon-sprite{position:absolute;width:0;height:0;overflow:hidden}
+  input[type=file]{display:none}
+  .visor{position:relative;width:100%;aspect-ratio:1;border-radius:14px;overflow:hidden;background:#e7e5e4;display:grid;place-items:center;margin-top:14px}
+  .visor video,.visor img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .visor .vacio{color:var(--suave);text-align:center;padding:20px;font-size:.95rem}
+  .visor .guia{position:absolute;inset:12%;border:2px dashed rgba(255,255,255,.85);border-radius:16px;pointer-events:none;box-shadow:0 0 0 999px rgba(0,0,0,.18)}
+  .visor .disparo{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);width:70px;height:70px;border-radius:50%;border:5px solid #fff;background:rgba(255,255,255,.35);cursor:pointer}
+  .oculto{display:none!important}
+  .resultado h2{margin:0 0 2px;font-size:1.35rem;font-style:italic}
+  .resultado .conf{color:var(--suave);font-size:.92rem;margin-bottom:12px}
+  .aviso{background:#fef3c7;color:#78350f;border-radius:10px;padding:10px 12px;font-size:.9rem;margin-bottom:12px}
+  .fila{display:grid;grid-template-columns:1fr auto;gap:2px 10px;margin:9px 0;font-size:.93rem}
+  .fila .nom{font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fila .nom a{color:inherit}
+  .fila .pct{font-variant-numeric:tabular-nums;color:var(--suave)}
+  .fila .bar{grid-column:1/-1;height:8px;background:var(--borde);border-radius:6px;overflow:hidden}
+  .fila .bar div{height:100%;background:var(--verde);border-radius:6px}
+  .fila:first-of-type .bar div{background:linear-gradient(90deg,var(--verde),#22c55e)}
+  .meta{display:flex;gap:14px;flex-wrap:wrap;color:var(--suave);font-size:.82rem;margin-top:10px}
+  details summary{cursor:pointer;font-weight:600}
+  .pipeline{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:12px 0;font-size:.82rem}
+  .pipeline span{background:var(--verde-cl);color:var(--verde-osc);padding:5px 9px;border-radius:8px}
+  .pipeline i{color:var(--suave);font-style:normal}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+  .stat{background:var(--fondo);border-radius:10px;padding:10px;text-align:center}
+  .stat b{display:block;font-size:1.25rem;color:var(--verde-osc)}
+  .stat small{color:var(--suave)}
+  #lista-especies{columns:2;font-size:.82rem;font-style:italic;color:var(--suave);max-height:260px;overflow:auto;margin-top:10px}
+  footer{text-align:center;color:var(--suave);font-size:.8rem;padding:0 16px 30px}
+  @media (min-width:600px){.botones{grid-template-columns:1fr 1fr 1fr}.btn-prim{grid-column:auto;font-size:1rem;min-height:54px}}
+</style>
+</head>
+<body>
+<svg class="icon-sprite" aria-hidden="true">
+  <symbol id="icon-leaf" viewBox="0 0 24 24">
+    <path d="M20.8 3.2C12 3.2 5.3 7.2 5.3 13.5c0 3.4 2.5 5.8 5.9 5.8 6.6 0 9.6-6.4 9.6-16.1Z"/>
+    <path d="M5.5 20c3-5.7 7.4-9.4 12.4-12.7M10 16l-.3-4.2M13.5 12.8l4.2.4"/>
+  </symbol>
+  <symbol id="icon-camera" viewBox="0 0 24 24">
+    <path d="M8.2 6l1.2-2h5.2l1.2 2h3.2A2.2 2.2 0 0 1 21.2 8.2v8.6a2.2 2.2 0 0 1-2.2 2.2H5a2.2 2.2 0 0 1-2.2-2.2V8.2A2.2 2.2 0 0 1 5 6h3.2Z"/>
+    <circle cx="12" cy="12.5" r="3.5"/>
+  </symbol>
+  <symbol id="icon-image" viewBox="0 0 24 24">
+    <rect x="3" y="4" width="18" height="16" rx="2"/>
+    <circle cx="8" cy="9" r="1.5"/>
+    <path d="m5.5 18 4.8-5 3.2 3 2.3-2.2 2.7 4.2"/>
+  </symbol>
+  <symbol id="icon-video" viewBox="0 0 24 24">
+    <rect x="3" y="6" width="13" height="12" rx="2"/>
+    <path d="m16 10 5-3v10l-5-3Z"/>
+  </symbol>
+  <symbol id="icon-stop" viewBox="0 0 24 24">
+    <rect class="icon-fill" x="6" y="6" width="12" height="12" rx="2"/>
+  </symbol>
+  <symbol id="icon-clock" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M12 7v5l3.2 2"/>
+  </symbol>
+  <symbol id="icon-chip" viewBox="0 0 24 24">
+    <rect x="7" y="7" width="10" height="10" rx="2"/>
+    <path d="M9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4"/>
+  </symbol>
+</svg>
+<header><div class="wrap">
+  <h1><svg class="icon" aria-hidden="true"><use href="#icon-leaf"></use></svg> Identificador de hojas</h1>
+  <p>Red neuronal convolucional que reconoce la especie de un árbol a partir de la foto de una hoja.</p>
+</div></header>
+
+<main>
+  <section class="card">
+    <div class="estado"><span id="punto" class="punto carga"></span><span id="estado">Cargando el modelo…</span></div>
+    <div class="barra-carga" id="barra-carga"><div id="progreso"></div></div>
+  </section>
+
+  <section class="card">
+    <div class="botones">
+      <button class="btn btn-prim" id="btn-foto" disabled><svg class="icon" aria-hidden="true"><use href="#icon-camera"></use></svg> Tomar foto</button>
+      <button class="btn btn-sec" id="btn-galeria" disabled><svg class="icon" aria-hidden="true"><use href="#icon-image"></use></svg> Galería</button>
+      <button class="btn btn-sec" id="btn-vivo" disabled><svg class="icon" aria-hidden="true"><use href="#icon-video"></use></svg> Cámara en vivo</button>
+    </div>
+    <input type="file" id="in-foto" accept="image/*" capture="environment">
+    <input type="file" id="in-galeria" accept="image/*">
+
+    <div class="visor" id="visor">
+      <div class="vacio" id="vacio">Toma una foto de <b>una sola hoja</b>, centrada y sobre un fondo claro.</div>
+      <img id="foto" class="oculto" alt="Foto de la hoja">
+      <video id="video" class="oculto" playsinline muted></video>
+      <div class="guia oculto" id="guia"></div>
+      <button class="disparo oculto" id="disparo" aria-label="Capturar"></button>
+    </div>
+  </section>
+
+  <section class="card resultado oculto" id="resultado">
+    <div class="aviso oculto" id="aviso">No estoy seguro. Puede que la especie no esté entre las que conozco, o que la foto tenga mucho fondo. Intenta acercarte a la hoja.</div>
+    <h2 id="r-nombre"></h2>
+    <div class="conf" id="r-conf"></div>
+    <div id="r-top"></div>
+    <div class="meta"><span id="r-tiempo"></span><span id="r-backend"></span></div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>¿Cómo funciona?</summary>
+      <div class="pipeline">
+        <span>Foto</span><i>→</i><span>Recorte 224×224</span><i>→</i><span>Capas convolucionales (MobileNetV2)</span><i>→</i><span>Pooling global</span><i>→</i><span>Softmax</span><i>→</i><span>Especie</span>
+      </div>
+      <p style="font-size:.9rem;color:var(--suave);margin:0">
+        La red se entrenó con <i>transfer learning</i>: se partió de MobileNetV2, preentrenada con ImageNet, y se reentrenó con el dataset público
+        <a href="http://leafsnap.com/dataset/" target="_blank" rel="noopener">LeafSnap</a> (Kumar et al., 2012).
+        La predicción se calcula <b>en tu propio celular</b> con TensorFlow.js. La foto no se envía a ningún servidor.
+      </p>
+      <div class="stats">
+        <div class="stat"><b id="s-clases">–</b><small>especies</small></div>
+        <div class="stat"><b id="s-top1">–</b><small>precisión top‑1</small></div>
+        <div class="stat"><b id="s-top5">–</b><small>precisión top‑5</small></div>
+      </div>
+      <details style="margin-top:12px"><summary style="font-weight:500;font-size:.9rem">Ver las especies que reconoce</summary>
+        <div id="lista-especies"></div>
+      </details>
+    </details>
+  </section>
+</main>
+<footer>Proyecto académico · Redes neuronales convolucionales · TensorFlow.js</footer>
+
+<script>
+const UMBRAL = 0.40;           // por debajo de esta confianza se muestra el aviso
+const TOP_K = 5;
+const $ = id => document.getElementById(id);
+let modelo, info, IMG = 224, stream = null;
+
+function estado(txt, tipo){ $("estado").textContent = txt; $("punto").className = "punto " + tipo; }
+
+async function iniciar(){
+  try{
+    try { await tf.setBackend("webgl"); } catch(e) { await tf.setBackend("cpu"); }
+    await tf.ready();
+    info = await (await fetch("model/labels.json")).json();
+    IMG = info.img_size || 224;
+    modelo = await tf.loadGraphModel("model/model.json", {
+      onProgress: p => $("progreso").style.width = (p*100).toFixed(0) + "%"
+    });
+    tf.tidy(() => { modelo.predict(tf.zeros([1, IMG, IMG, 3])); });   // calentamiento
+    $("barra-carga").classList.add("oculto");
+    estado(`Modelo listo · ${info.nombres.length} especies · ${tf.getBackend()}`, "ok");
+    ["btn-foto","btn-galeria","btn-vivo"].forEach(id => $(id).disabled = false);
+    $("s-clases").textContent = info.nombres.length;
+    if (info.precision_test != null) $("s-top1").textContent = (info.precision_test*100).toFixed(1) + "%";
+    if (info.top5_test != null) $("s-top5").textContent = (info.top5_test*100).toFixed(1) + "%";
+    $("lista-especies").innerHTML = info.nombres.map(n => `<div>${n}</div>`).join("");
+  }catch(err){
+    console.error(err);
+    estado("No se pudo cargar el modelo: " + err.message, "error");
+  }
+}
+
+// Recorte central cuadrado → 224×224, igual que en el entrenamiento
+function aTensor(fuente, ancho, alto){
+  const lado = Math.min(ancho, alto);
+  const c = document.createElement("canvas"); c.width = c.height = IMG;
+  const ctx = c.getContext("2d");
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(fuente, (ancho - lado)/2, (alto - lado)/2, lado, lado, 0, 0, IMG, IMG);
+  return tf.tidy(() => tf.browser.fromPixels(c).toFloat().expandDims(0));
+}
+
+async function predecir(fuente, ancho, alto){
+  const t0 = performance.now();
+  const x = aTensor(fuente, ancho, alto);
+  const y = modelo.predict(x);
+  const probs = await y.data();
+  x.dispose(); y.dispose();
+  const ms = performance.now() - t0;
+
+  const orden = Array.from(probs.keys()).sort((a,b) => probs[b]-probs[a]).slice(0, TOP_K);
+  const mejor = orden[0];
+  $("r-nombre").textContent = info.nombres[mejor];
+  $("r-conf").textContent = `Confianza: ${(probs[mejor]*100).toFixed(1)}%`;
+  $("aviso").classList.toggle("oculto", probs[mejor] >= UMBRAL);
+  $("r-top").innerHTML = orden.map(i => `
+    <div class="fila">
+      <span class="nom"><a href="https://es.wikipedia.org/wiki/${encodeURIComponent(info.nombres[i].replace(/ /g,"_"))}" target="_blank" rel="noopener">${info.nombres[i]}</a></span>
+      <span class="pct">${(probs[i]*100).toFixed(1)}%</span>
+      <span class="bar"><div style="width:${(probs[i]*100).toFixed(1)}%"></div></span>
+    </div>`).join("");
+  $("r-tiempo").innerHTML = `<svg class="icon" aria-hidden="true"><use href="#icon-clock"></use></svg> ${ms.toFixed(0)} ms`;
+  $("r-backend").innerHTML = `<svg class="icon" aria-hidden="true"><use href="#icon-chip"></use></svg> ${tf.getBackend()}`;
+  $("resultado").classList.remove("oculto");
+  $("resultado").scrollIntoView({behavior:"smooth", block:"nearest"});
+}
+
+function mostrarFoto(archivo){
+  if (!archivo) return;
+  detenerCamara();
+  const url = URL.createObjectURL(archivo);
+  const img = $("foto");
+  img.onload = () => predecir(img, img.naturalWidth, img.naturalHeight);
+  img.src = url;
+  img.classList.remove("oculto"); $("vacio").classList.add("oculto");
+}
+
+async function iniciarCamara(){
+  if (stream) { detenerCamara(); return; }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:1280}}, audio:false});
+    const v = $("video"); v.srcObject = stream; await v.play();
+    ["video","guia","disparo"].forEach(id => $(id).classList.remove("oculto"));
+    ["foto","vacio"].forEach(id => $(id).classList.add("oculto"));
+    $("btn-vivo").innerHTML = `<svg class="icon" aria-hidden="true"><use href="#icon-stop"></use></svg> Detener cámara`;
+  }catch(err){
+    alert("No se pudo abrir la cámara. Usa «Tomar foto» o revisa los permisos. (" + err.message + ")");
+  }
+}
+function detenerCamara(){
+  if (!stream) return;
+  stream.getTracks().forEach(t => t.stop()); stream = null;
+  ["video","guia","disparo"].forEach(id => $(id).classList.add("oculto"));
+  $("btn-vivo").innerHTML = `<svg class="icon" aria-hidden="true"><use href="#icon-video"></use></svg> Cámara en vivo`;
+}
+function capturar(){
+  const v = $("video");
+  const c = document.createElement("canvas"); c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v, 0, 0);
+  c.toBlob(b => mostrarFoto(b), "image/jpeg", 0.92);
+}
+
+$("btn-foto").onclick = () => $("in-foto").click();
+$("btn-galeria").onclick = () => $("in-galeria").click();
+$("btn-vivo").onclick = iniciarCamara;
+$("disparo").onclick = capturar;
+$("in-foto").onchange = e => { mostrarFoto(e.target.files[0]); e.target.value = ""; };
+$("in-galeria").onchange = e => { mostrarFoto(e.target.files[0]); e.target.value = ""; };
+iniciar();
+</script>
+</body>
+</html>
